@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// Khai báo 2 màn hình kia để bấm nút là chuyển qua được
 import 'cart_screen.dart';
 import 'add_product_screen.dart';
 
@@ -16,6 +15,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<dynamic>> _productsFuture;
   List<Map<String, dynamic>> cart = [];
+
+  // --- THÊM 2 BIẾN MỚI ĐỂ LƯU TRẠNG THÁI TÌM KIẾM ---
+  String _searchQuery = '';
+  String _selectedCategory = 'Tất cả';
 
   @override
   void initState() {
@@ -132,50 +135,122 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: Text('Chưa có mặt hàng nào.'));
           }
 
-          final products = snapshot.data!;
-          return GridView.builder(
-            padding: const EdgeInsets.all(10),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.85,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-            ),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              final item = products[index];
-              return Card(
-                elevation: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.inventory_2, size: 50, color: Colors.teal),
-                      const SizedBox(height: 10),
-                      Text(
-                        item['name'] ?? 'Chưa có tên',
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '${item['price']} đ',
-                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () => addToCart(item),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Thêm'),
-                      )
-                    ],
+          final allProducts = snapshot.data!;
+
+          // --- LOGIC LỌC DỮ LIỆU ---
+          // 1. Tự động trích xuất các danh mục hiện có từ Database
+          List<String> categories = ['Tất cả'];
+          categories.addAll(allProducts.map((p) => p['category'].toString()).toSet().toList());
+
+          // 2. Lọc sản phẩm theo Từ khóa và Danh mục
+          final filteredProducts = allProducts.where((product) {
+            final matchesSearch = product['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+            final matchesCategory = _selectedCategory == 'Tất cả' || product['category'] == _selectedCategory;
+            return matchesSearch && matchesCategory;
+          }).toList();
+
+          return Column(
+            children: [
+              // --- THANH TÌM KIẾM ---
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: TextField(
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Tìm ống nhựa, đinh vít, búa...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.grey[200],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
-              );
-            },
+              ),
+
+              // --- THANH CUỘN DANH MỤC (CATEGORIES) ---
+              SizedBox(
+                height: 50,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = category == _selectedCategory;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        label: Text(category),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedCategory = category;
+                          });
+                        },
+                        selectedColor: Colors.teal.shade200,
+                        backgroundColor: Colors.grey[200],
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // --- DANH SÁCH SẢN PHẨM (ĐÃ LỌC) ---
+              Expanded(
+                child: filteredProducts.isEmpty
+                    ? const Center(child: Text('Không tìm thấy mặt hàng này!', style: TextStyle(color: Colors.grey, fontSize: 16)))
+                    : GridView.builder(
+                  padding: const EdgeInsets.all(10),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.85,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    final item = filteredProducts[index];
+                    return Card(
+                      elevation: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.inventory_2, size: 50, color: Colors.teal),
+                            const SizedBox(height: 10),
+                            Text(
+                              item['name'] ?? 'Chưa có tên',
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              '${item['price']} đ',
+                              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: () => addToCart(item),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Thêm'),
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
