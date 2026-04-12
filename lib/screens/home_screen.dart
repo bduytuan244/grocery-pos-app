@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'cart_screen.dart';
 import 'add_product_screen.dart';
+import 'recent_orders_widget.dart'; // Đã import file Lịch sử
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,9 +17,12 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<dynamic>> _productsFuture;
   List<Map<String, dynamic>> cart = [];
 
-  // --- THÊM 2 BIẾN MỚI ĐỂ LƯU TRẠNG THÁI TÌM KIẾM ---
+  // Các biến tìm kiếm
   String _searchQuery = '';
   String _selectedCategory = 'Tất cả';
+
+  // Danh sách lưu 5 đơn gần nhất
+  List<Map<String, dynamic>> recentOrders = [];
 
   @override
   void initState() {
@@ -59,7 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-  List<Map<String, dynamic>> recentOrders = [];
 
   void openCartScreen() async {
     final result = await Navigator.push(
@@ -69,22 +72,17 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    // Nếu kết quả trả về là một đơn hàng (không phải null)
+    // Xử lý khi nhận được đơn hàng trả về từ màn hình Thanh toán
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
-        // Thêm vào đầu danh sách
         recentOrders.insert(0, result);
-
-        // Nếu quá 5 đơn, xóa đơn cuối cùng
         if (recentOrders.length > 5) {
           recentOrders.removeLast();
         }
-
-        // Xóa sạch giỏ hàng hiện tại sau khi đã thanh toán
-        cart.clear();
+        cart.clear(); // Xóa giỏ hàng
       });
     } else {
-      setState(() {}); // Cập nhật lại giao diện nếu khách chỉ xóa bớt hàng
+      setState(() {});
     }
   }
 
@@ -154,12 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
           final allProducts = snapshot.data!;
 
-          // --- LOGIC LỌC DỮ LIỆU ---
-          // 1. Tự động trích xuất các danh mục hiện có từ Database
           List<String> categories = ['Tất cả'];
           categories.addAll(allProducts.map((p) => p['category'].toString()).toSet().toList());
 
-          // 2. Lọc sản phẩm theo Từ khóa và Danh mục
           final filteredProducts = allProducts.where((product) {
             final matchesSearch = product['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
             final matchesCategory = _selectedCategory == 'Tất cả' || product['category'] == _selectedCategory;
@@ -168,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return Column(
             children: [
-              // --- THANH TÌM KIẾM ---
+              // 1. THANH TÌM KIẾM
               Padding(
                 padding: const EdgeInsets.all(10.0),
                 child: TextField(
@@ -190,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // --- THANH CUỘN DANH MỤC (CATEGORIES) ---
+              // 2. THANH DANH MỤC
               SizedBox(
                 height: 50,
                 child: ListView.builder(
@@ -218,7 +213,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // --- DANH SÁCH SẢN PHẨM (ĐÃ LỌC) ---
+              RecentOrdersWidget(orders: recentOrders),
+
               Expanded(
                 child: filteredProducts.isEmpty
                     ? const Center(child: Text('Không tìm thấy mặt hàng này!', style: TextStyle(color: Colors.grey, fontSize: 16)))
