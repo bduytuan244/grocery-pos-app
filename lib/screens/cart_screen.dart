@@ -77,9 +77,22 @@ class _CartScreenState extends State<CartScreen> {
                   height: 50,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                    // Trong nút ElevatedButton của CartScreen
                     onPressed: () {
+                      if (widget.cart.isEmpty) return;
+
+                      // Tạo đối tượng đơn hàng để lưu lịch sử
+                      final newOrder = {
+                        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                        'time': TimeOfDay.now().format(context),
+                        'items': List.from(widget.cart), // Sao chép danh sách giỏ hàng
+                        'total': widget.cart.fold(0.0, (sum, item) => sum + (item['price'] * item['quantity'])),
+                      };
+
+                      Navigator.pop(context, newOrder);
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Chốt đơn thành công!')),
+                        const SnackBar(content: Text('Thanh toán thành công!'), backgroundColor: Colors.green),
                       );
                     },
                     child: const Text('XÁC NHẬN THANH TOÁN', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
