@@ -59,16 +59,33 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  List<Map<String, dynamic>> recentOrders = [];
 
-  void openCartScreen() {
-    Navigator.push(
+  void openCartScreen() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CartScreen(cart: cart),
       ),
-    ).then((_) {
-      setState(() {});
-    });
+    );
+
+    // Nếu kết quả trả về là một đơn hàng (không phải null)
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        // Thêm vào đầu danh sách
+        recentOrders.insert(0, result);
+
+        // Nếu quá 5 đơn, xóa đơn cuối cùng
+        if (recentOrders.length > 5) {
+          recentOrders.removeLast();
+        }
+
+        // Xóa sạch giỏ hàng hiện tại sau khi đã thanh toán
+        cart.clear();
+      });
+    } else {
+      setState(() {}); // Cập nhật lại giao diện nếu khách chỉ xóa bớt hàng
+    }
   }
 
   @override
