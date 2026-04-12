@@ -247,7 +247,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.inventory_2, size: 50, color: Colors.teal),
+                            // Nếu có link ảnh và link không bị trống thì hiện ảnh. Nếu ảnh bị lỗi hoặc không có thì hiện cái Icon mặc định.
+                            (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
+                                ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                item['imageUrl'],
+                                height: 70,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                // Bắt lỗi nếu link ảnh bị chết thì tự hiện icon thay thế
+                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+                              ),
+                            )
+                                : const Icon(Icons.inventory_2, size: 60, color: Colors.teal),
                             const SizedBox(height: 10),
                             Text(
                               item['name'] ?? 'Chưa có tên',
