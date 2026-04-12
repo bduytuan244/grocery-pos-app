@@ -7,6 +7,7 @@ class AddProductScreen extends StatefulWidget {
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
+
 }
 
 class _AddProductScreenState extends State<AddProductScreen> {
@@ -15,6 +16,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _categoryController = TextEditingController();
   final _priceController = TextEditingController();
   final _unitController = TextEditingController();
+  final _imageController = TextEditingController();
 
   bool _isLoading = false;
 
@@ -27,11 +29,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
       "category": _categoryController.text.isEmpty ? "Khác" : _categoryController.text,
       "unit": _unitController.text.isEmpty ? "Cái" : _unitController.text,
       "price": double.parse(_priceController.text),
+      "imageUrl": _imageController.text, // <--- THÊM DÒNG NÀY
       "stock": 100,
       "hasVariants": false,
       "keywords": _nameController.text.toLowerCase().split(' ')
     };
-
     try {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:8080/api/products'),
@@ -108,6 +110,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 15),
+              TextFormField(
+                controller: _imageController,
+                decoration: const InputDecoration(
+                  labelText: 'Link ảnh (URL)',
+                  hintText: 'Dán link ảnh từ Google vào đây',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 15),
               TextFormField(
