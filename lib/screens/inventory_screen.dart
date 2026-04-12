@@ -47,25 +47,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _showEditDialog(Map<String, dynamic> product) {
     final nameController = TextEditingController(text: product['name']);
     final priceController = TextEditingController(text: product['price'].toString());
+    // THÊM: Biến lưu trữ link ảnh hiện tại (nếu có)
+    final imageController = TextEditingController(text: product['imageUrl'] ?? '');
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sửa Thông Tin', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Tên mặt hàng'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Giá bán (VNĐ)'),
-            ),
-          ],
+        // Bọc SingleChildScrollView để tránh lỗi bàn phím đè lên form
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Tên mặt hàng'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Giá bán (VNĐ)'),
+              ),
+              const SizedBox(height: 10),
+              // THÊM: Ô nhập link ảnh
+              TextField(
+                controller: imageController,
+                decoration: const InputDecoration(
+                    labelText: 'Link ảnh (URL)',
+                    hintText: 'Dán link ảnh từ mạng vào đây'
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
@@ -77,7 +91,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 final response = await http.put(
                   Uri.parse('http://10.0.2.2:8080/api/products/${product['id']}'),
                   headers: {"Content-Type": "application/json"},
-                  body: jsonEncode({"name": nameController.text, "price": double.parse(priceController.text)}),
+                  body: jsonEncode({
+                    "name": nameController.text,
+                    "price": double.parse(priceController.text),
+                    "imageUrl": imageController.text // Gửi thêm link ảnh mới lên server
+                  }),
                 );
 
                 if (response.statusCode == 200) {
@@ -122,7 +140,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
             itemBuilder: (context, index) {
               final item = products[index];
               return ListTile(
-                leading: const Icon(Icons.inventory, color: Colors.blueGrey),
+                // HIỂN THỊ ẢNH THU NHỎ TRONG KHO
+                leading: SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(
+                      item['imageUrl'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  )
+                      : const Icon(Icons.inventory, color: Colors.blueGrey, size: 40),
+                ),
                 title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text('${item['price']} đ', style: const TextStyle(color: Colors.red)),
                 trailing: Row(
