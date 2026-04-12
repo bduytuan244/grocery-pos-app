@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'inventory_screen.dart';
 
 import 'cart_screen.dart';
 import 'add_product_screen.dart';
@@ -95,6 +96,16 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Máy Tính Tiền POS', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, size: 28),
+            onPressed: () async {
+              // Mở màn hình kho, đợi khi nào tắt kho quay lại thì tải lại giao diện chính
+              await Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen()));
+              setState(() {
+                _productsFuture = fetchProducts();
+              });
+            },
+          ),
           Stack(
             alignment: Alignment.center,
             children: [
