@@ -97,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Máy Tính Tiền POS', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // 1. NÚT VÀO KHO HÀNG (Cài đặt)
           IconButton(
             icon: const Icon(Icons.settings, size: 28),
             onPressed: () async {
@@ -107,19 +108,22 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
           ),
+
+          // 2. NÚT XEM THỐNG KÊ (Biểu đồ)
+          IconButton(
+            icon: const Icon(Icons.bar_chart, size: 28),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const StatisticsScreen()));
+            },
+          ),
+
+          // 3. NÚT GIỎ HÀNG (Kèm cục báo số màu đỏ)
           Stack(
             alignment: Alignment.center,
             children: [
               IconButton(
                 icon: const Icon(Icons.shopping_cart, size: 28),
                 onPressed: openCartScreen,
-              ),
-              // NÚT XEM THỐNG KÊ (MỚI THÊM)
-              IconButton(
-                icon: const Icon(Icons.bar_chart, size: 28),
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const StatisticsScreen()));
-                },
               ),
               if (totalItems > 0)
                 Positioned(
