@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'inventory_screen.dart';
+import 'statistics_screen.dart';
 
 import 'cart_screen.dart';
 import 'add_product_screen.dart';
@@ -112,6 +113,13 @@ class _HomeScreenState extends State<HomeScreen> {
               IconButton(
                 icon: const Icon(Icons.shopping_cart, size: 28),
                 onPressed: openCartScreen,
+              ),
+              // NÚT XEM THỐNG KÊ (MỚI THÊM)
+              IconButton(
+                icon: const Icon(Icons.bar_chart, size: 28),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const StatisticsScreen()));
+                },
               ),
               if (totalItems > 0)
                 Positioned(
