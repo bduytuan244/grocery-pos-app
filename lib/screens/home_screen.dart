@@ -196,33 +196,47 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // 2. THANH DANH MỤC
-              SizedBox(
-                height: 50,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final isSelected = category == _selectedCategory;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: Text(category),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedCategory = category;
-                          });
-                        },
-                        selectedColor: Colors.teal.shade200,
-                        backgroundColor: Colors.grey[200],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.category, color: Colors.teal),
+                    const SizedBox(width: 10),
+                    const Text('Lọc theo:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedCategory,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down, color: Colors.teal),
+                            items: categories.map((String category) {
+                              return DropdownMenuItem<String>(
+                                value: category,
+                                child: Text(category, style: const TextStyle(fontSize: 16)),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  _selectedCategory = newValue;
+                                });
+                              }
+                            },
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 10), // Khoảng cách với Lịch sử đơn hàng
 
               RecentOrdersWidget(orders: recentOrders),
 
