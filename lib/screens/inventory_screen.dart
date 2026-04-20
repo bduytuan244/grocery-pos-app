@@ -20,7 +20,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   // Hàm tải dữ liệu
   Future<List<dynamic>> fetchProducts() async {
-    final response = await http.get(Uri.parse('http://10.0.2.2:8080/api/products'));
+    final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products'));
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
@@ -31,7 +31,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // Hàm Xóa sản phẩm
   Future<void> _deleteProduct(String id, String name) async {
     try {
-      final response = await http.delete(Uri.parse('http://10.0.2.2:8080/api/products/$id'));
+      final response = await http.delete(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products/$id'));
       if (response.statusCode == 200 || response.statusCode == 204) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Đã xóa $name'), backgroundColor: Colors.red));
         setState(() { _productsFuture = fetchProducts(); }); // Tải lại danh sách
@@ -89,7 +89,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               // Gọi API cập nhật (PUT)
               try {
                 final response = await http.put(
-                  Uri.parse('http://10.0.2.2:8080/api/products/${product['id']}'),
+                  Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products/${product['id']}'),
                   headers: {"Content-Type": "application/json"},
                   body: jsonEncode({
                     "name": nameController.text,

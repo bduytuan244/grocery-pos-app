@@ -38,7 +38,7 @@ class _CartScreenState extends State<CartScreen> {
     // 2. Gửi qua mạng
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:8080/api/orders'),
+        Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/orders'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(orderData),
       );
