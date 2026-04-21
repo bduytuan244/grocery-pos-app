@@ -94,26 +94,70 @@ class _CartScreenState extends State<CartScreen> {
               itemCount: widget.cart.length,
               itemBuilder: (context, index) {
                 final item = widget.cart[index];
-                return ListTile(
-                  leading: const Icon(Icons.check_box, color: Colors.teal),
-                  title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${item['price']} đ  x  ${item['quantity']}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${item['price'] * item['quantity']} đ',
-                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.grey),
-                        onPressed: () {
-                          setState(() {
-                            widget.cart.removeAt(index);
-                          });
-                        },
-                      )
-                    ],
+
+                // Bọc Dismissible để tạo hiệu ứng vuốt ngang để xóa
+                return Dismissible(
+                  key: UniqueKey(), // Cấp key duy nhất để Flutter biết đang vuốt món nào
+                  direction: DismissDirection.horizontal, // Vuốt được cả trái và phải
+                  background: Container(
+                    color: Colors.red,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    child: const Icon(Icons.delete_sweep, color: Colors.white, size: 30),
+                  ),
+                  secondaryBackground: Container(
+                    color: Colors.red,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete_sweep, color: Colors.white, size: 30),
+                  ),
+                  onDismissed: (direction) {
+                    setState(() {
+                      widget.cart.removeAt(index);
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Đã xóa ${item['name']}')),
+                    );
+                  },
+                  child: ListTile(
+                    leading: const Icon(Icons.check_box, color: Colors.teal),
+                    title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Đơn giá: ${item['price']} đ'),
+                    // Cụm nút Cộng - Trừ chuyên nghiệp
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Nút TRỪ (Chỉ trừ số lượng, không xóa món)
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+                          onPressed: () {
+                            setState(() {
+                              if (widget.cart[index]['quantity'] > 1) {
+                                widget.cart[index]['quantity']--;
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Vuốt ngang màn hình để xóa hẳn món này!')),
+                                );
+                              }
+                            });
+                          },
+                        ),
+                        // Hiện số lượng
+                        Text(
+                          '${item['quantity']}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        // Nút CỘNG
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline, color: Colors.teal),
+                          onPressed: () {
+                            setState(() {
+                              widget.cart[index]['quantity']++;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
