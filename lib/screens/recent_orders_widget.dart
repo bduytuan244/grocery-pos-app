@@ -7,32 +7,30 @@ class RecentOrdersWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nếu chưa có đơn nào, ẩn luôn toàn bộ khu vực này cho tiết kiệm diện tích
     if (orders.isEmpty) {
-      return const Center(
-        child: Text('Chưa có đơn hàng nào vừa xong.', style: TextStyle(color: Colors.grey)),
-      );
+      return const SizedBox.shrink();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(10),
-          child: Text(
-            '5 ĐƠN HÀNG VỪA XONG',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
-          ),
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: ExpansionTile(
+        initiallyExpanded: false, // Mặc định thu gọn
+        leading: const Icon(Icons.history, color: Colors.teal),
+        title: const Text(
+          'Lịch sử 5 đơn vừa xong',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
         ),
-        // Sử dụng ListView.builder để vẽ danh sách
-        ListView.builder(
-          shrinkWrap: true, // Quan trọng: Để ListView nằm gọn trong Column
-          physics: const NeverScrollableScrollPhysics(), // Để cuộn theo màn hình chính
-          itemCount: orders.length,
-          itemBuilder: (context, index) {
-            final order = orders[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              child: ListTile(
+        children: [
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: orders.length,
+            itemBuilder: (context, index) {
+              final order = orders[index];
+              return ListTile(
                 leading: CircleAvatar(
                   backgroundColor: Colors.teal.shade100,
                   child: Text('${index + 1}', style: const TextStyle(color: Colors.teal)),
@@ -40,15 +38,12 @@ class RecentOrdersWidget extends StatelessWidget {
                 title: Text('Tổng: ${order['total']} đ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
                 subtitle: Text('Lúc: ${order['time']} - ${order['items'].length} món'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  // Hiển thị chi tiết các món trong đơn này khi mẹ bạn bấm vào
-                  _showOrderDetails(context, order);
-                },
-              ),
-            );
-          },
-        ),
-      ],
+                onTap: () => _showOrderDetails(context, order),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
