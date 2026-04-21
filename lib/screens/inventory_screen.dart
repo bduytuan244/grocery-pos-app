@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data'; // <--- DÙNG THƯ VIỆN NÀY THAY CHO dart:io
 import 'package:image_picker/image_picker.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -20,7 +20,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _productsFuture = fetchProducts();
   }
 
-  // Hàm tải dữ liệu
   Future<List<dynamic>> fetchProducts() async {
     final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products'));
     if (response.statusCode == 200) {
@@ -30,7 +29,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  // Hàm Xóa sản phẩm
   Future<void> _deleteProduct(String id, String name) async {
     try {
       final response = await http.delete(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products/$id'));
@@ -45,24 +43,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  // === HÀM MỚI: HIỂN THỊ ẢNH PHÓNG TO ===
   void _showZoomedImageDialog(BuildContext context, String imageUrl) {
     if (imageUrl.isEmpty) return;
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: Colors.transparent, // Nền trong suốt làm nổi bật ảnh
+        backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(10),
         child: GestureDetector(
-          onTap: () => Navigator.pop(context), // Nhấn vào ảnh để đóng
+          onTap: () => Navigator.pop(context),
           child: InteractiveViewer(
-            panEnabled: true, // Cho phép dùng ngón tay kéo ảnh
+            panEnabled: true,
             boundaryMargin: const EdgeInsets.all(20),
             minScale: 0.5,
-            maxScale: 4, // Cho phép zoom to gấp 4 lần
+            maxScale: 4,
             child: Image.network(
               imageUrl,
-              fit: BoxFit.contain, // Hiển thị trọn vẹn ảnh không bị cắt
+              fit: BoxFit.contain,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -75,38 +72,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // Hàm hiển thị Bảng Sửa sản phẩm
   void _showEditDialog(Map<String, dynamic> product) {
     final nameController = TextEditingController(text: product['name']);
     final priceController = TextEditingController(text: product['price'].toString());
 
-    // Biến lưu link ảnh (Mặc định lấy ảnh cũ)
     String finalImageUrl = product['imageUrl'] ?? '';
-    File? selectedLocalImage; // Biến lưu ảnh tạm nếu chọn ảnh mới
-    bool isUploading = false; // Biến xoay vòng tải
+
+    // === THAY ĐỔI LỚN Ở ĐÂY: DÙNG Uint8List THAY CHO File ===
+    Uint8List? selectedImageBytes;
+    bool isUploading = false;
 
     showDialog(
       context: context,
       builder: (context) {
-        // StatefulBuilder giúp Dialog có thể tự cập nhật giao diện (hiện vòng xoay)
         return StatefulBuilder(
             builder: (context, setStateDialog) {
 
-              // HÀM CHỌN ẢNH VÀ UP LÊN IMGBB DÀNH RIÊNG CHO DIALOG NÀY
               Future<void> pickAndUploadImage() async {
                 final ImagePicker picker = ImagePicker();
                 final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
                 if (image != null) {
+                  // Đọc file thành cục dữ liệu Bytes (Chạy được trên Web)
+                  final bytes = await image.readAsBytes();
+
                   setStateDialog(() {
-                    selectedLocalImage = File(image.path);
+                    selectedImageBytes = bytes;
                     isUploading = true;
                   });
 
                   try {
-                    String apiKey = "4f4db14c9c558c9d21817076fd50cc78"; // API Key ImgBB
+                    String apiKey = "4f4db14c9c558c9d21817076fd50cc78";
                     var request = http.MultipartRequest('POST', Uri.parse('https://api.imgbb.com/1/upload?key=$apiKey'));
-                    request.files.add(await http.MultipartFile.fromPath('image', image.path));
+
+                    // Nén cục Bytes đó gửi lên mạng, bỏ qua đường dẫn ảo của Web
+                    request.files.add(http.MultipartFile.fromBytes(
+                        'image',
+                        bytes,
+                        filename: image.name
+                    ));
 
                     var response = await request.send();
                     var responseData = await response.stream.bytesToString();
@@ -114,7 +118,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                     if (result['success'] == true) {
                       setStateDialog(() {
-                        finalImageUrl = result['data']['url']; // Lấy link ảnh mới
+                        finalImageUrl = result['data']['url'];
                       });
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đổi ảnh thành công!'), backgroundColor: Colors.green));
                     } else {
@@ -134,7 +138,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // KHU VỰC ĐỔI ẢNH
                       GestureDetector(
                         onTap: pickAndUploadImage,
                         child: Container(
@@ -147,8 +150,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           ),
                           child: isUploading
                               ? const Center(child: CircularProgressIndicator(color: Colors.teal))
-                              : selectedLocalImage != null
-                              ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.file(selectedLocalImage!, fit: BoxFit.cover))
+                              : selectedImageBytes != null
+                          // Thay Image.file bằng Image.memory
+                              ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.memory(selectedImageBytes!, fit: BoxFit.cover))
                               : finalImageUrl.isNotEmpty
                               ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.network(finalImageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image_not_supported)))
                               : const Column(
@@ -181,14 +185,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                     onPressed: isUploading ? null : () async {
                       try {
+                        Map<String, dynamic> updatedProduct = Map<String, dynamic>.from(product);
+                        updatedProduct['name'] = nameController.text;
+                        updatedProduct['price'] = double.parse(priceController.text);
+                        updatedProduct['imageUrl'] = finalImageUrl;
+
                         final response = await http.put(
                           Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products/${product['id']}'),
                           headers: {"Content-Type": "application/json"},
-                          body: jsonEncode({
-                            "name": nameController.text,
-                            "price": double.parse(priceController.text),
-                            "imageUrl": finalImageUrl // Gửi link ảnh mới lên server
-                          }),
+                          body: jsonEncode(updatedProduct),
                         );
 
                         if (response.statusCode == 200) {
@@ -197,7 +202,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã cập nhật!'), backgroundColor: Colors.green));
                           setState(() { _productsFuture = fetchProducts(); });
                         } else {
-                          throw Exception('Chưa có API Put ở Backend');
+                          throw Exception('Lỗi Server');
                         }
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
@@ -236,10 +241,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             itemBuilder: (context, index) {
               final item = products[index];
               return ListTile(
-                // === THAY ĐỔI Ở ĐÂY: BỌC GESTURE DETECTOR ĐỂ BẤM VÀO ẢNH ===
                 leading: GestureDetector(
                   onTap: () {
-                    // Nếu có link ảnh thì mới gọi hàm Zoom
                     if (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty) {
                       _showZoomedImageDialog(context, item['imageUrl']);
                     }

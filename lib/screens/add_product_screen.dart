@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data'; // <--- Đã thay dart:io bằng thư viện này
 import 'package:image_picker/image_picker.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -19,28 +19,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _unitController = TextEditingController();
 
   bool _isLoading = false;
-  File? _selectedImage; // Biến lưu tấm ảnh chọn từ điện thoại
-  String _finalImageUrl = ""; // Biến lưu link ảnh sau khi đưa lên ImgBB
+  Uint8List? _selectedImageBytes; // <--- Đổi từ File sang Uint8List
+  String _finalImageUrl = "";
 
   // --- HÀM 1: CHỌN ẢNH VÀ ĐẨY LÊN IMGBB ---
   Future<void> _pickAndUploadImage() async {
     final ImagePicker picker = ImagePicker();
-    // Mở thư viện ảnh của điện thoại
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
     if (image != null) {
+      // Đọc file thành cục dữ liệu Bytes để chạy mượt trên Web
+      final bytes = await image.readAsBytes();
+
       setState(() {
-        _selectedImage = File(image.path);
-        _isLoading = true; // Hiện vòng xoay chờ tải ảnh
+        _selectedImageBytes = bytes;
+        _isLoading = true;
       });
 
       try {
-        // API KEY CỦA TUẤN ĐÃ ĐƯỢC GẮN VÀO ĐÂY:
         String apiKey = "4f4db14c9c558c9d21817076fd50cc78";
 
-        // Đóng gói ảnh gửi lên ImgBB
         var request = http.MultipartRequest('POST', Uri.parse('https://api.imgbb.com/1/upload?key=$apiKey'));
-        request.files.add(await http.MultipartFile.fromPath('image', image.path));
+
+        // Gửi dữ liệu từ RAM lên mạng (bỏ qua file path ảo của Web)
+        request.files.add(http.MultipartFile.fromBytes(
+            'image',
+            bytes,
+            filename: image.name
+        ));
 
         var response = await request.send();
         var responseData = await response.stream.bytesToString();
@@ -48,7 +54,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
         if (result['success'] == true) {
           setState(() {
-            // Lấy link xịn ImgBB trả về
             _finalImageUrl = result['data']['url'];
           });
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tải ảnh lên mạng thành công!'), backgroundColor: Colors.green));
@@ -57,7 +62,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi tải ảnh: $e'), backgroundColor: Colors.red));
-        setState(() => _selectedImage = null); // Bỏ chọn ảnh nếu lỗi
+        setState(() => _selectedImageBytes = null);
       } finally {
         setState(() => _isLoading = false);
       }
@@ -74,7 +79,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       "category": _categoryController.text.isEmpty ? "Khác" : _categoryController.text,
       "unit": _unitController.text.isEmpty ? "Cái" : _unitController.text,
       "price": double.parse(_priceController.text),
-      "imageUrl": _finalImageUrl, // <--- SỬ DỤNG LINK ẢNH XỊN TỪ IMGBB
+      "imageUrl": _finalImageUrl,
       "stock": 100,
       "hasVariants": false,
       "keywords": _nameController.text.toLowerCase().split(' ')
@@ -129,16 +134,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     border: Border.all(color: Colors.teal.withOpacity(0.5), width: 2, style: BorderStyle.solid),
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: _isLoading && _selectedImage != null
-                      ? const Center(child: CircularProgressIndicator(color: Colors.teal)) // Đang xoay chờ tải
-                      : _selectedImage != null
-                      ? ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.file(_selectedImage!, fit: BoxFit.cover, width: double.infinity))
+                  child: _isLoading && _selectedImageBytes != null
+                      ? const Center(child: CircularProgressIndicator(color: Colors.teal))
+                      : _selectedImageBytes != null
+                  // <--- Đổi từ Image.file sang Image.memory --->
+                      ? ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.memory(_selectedImageBytes!, fit: BoxFit.cover, width: double.infinity))
                       : const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.add_photo_alternate_outlined, size: 60, color: Colors.teal),
                       SizedBox(height: 10),
-                      Text('Bấm để chọn ảnh từ điện thoại', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('Bấm để chọn ảnh', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 16)),
                     ],
                   ),
                 ),
