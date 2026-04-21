@@ -45,6 +45,36 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  // === HÀM MỚI: HIỂN THỊ ẢNH PHÓNG TO ===
+  void _showZoomedImageDialog(BuildContext context, String imageUrl) {
+    if (imageUrl.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent, // Nền trong suốt làm nổi bật ảnh
+        insetPadding: const EdgeInsets.all(10),
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context), // Nhấn vào ảnh để đóng
+          child: InteractiveViewer(
+            panEnabled: true, // Cho phép dùng ngón tay kéo ảnh
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 0.5,
+            maxScale: 4, // Cho phép zoom to gấp 4 lần
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain, // Hiển thị trọn vẹn ảnh không bị cắt
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const Center(child: CircularProgressIndicator(color: Colors.white));
+              },
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, color: Colors.white, size: 50),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Hàm hiển thị Bảng Sửa sản phẩm
   void _showEditDialog(Map<String, dynamic> product) {
     final nameController = TextEditingController(text: product['name']);
@@ -206,19 +236,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
             itemBuilder: (context, index) {
               final item = products[index];
               return ListTile(
-                leading: SizedBox(
-                  width: 50,
-                  height: 50,
-                  child: (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      item['imageUrl'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, color: Colors.grey),
-                    ),
-                  )
-                      : const Icon(Icons.inventory, color: Colors.blueGrey, size: 40),
+                // === THAY ĐỔI Ở ĐÂY: BỌC GESTURE DETECTOR ĐỂ BẤM VÀO ẢNH ===
+                leading: GestureDetector(
+                  onTap: () {
+                    // Nếu có link ảnh thì mới gọi hàm Zoom
+                    if (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty) {
+                      _showZoomedImageDialog(context, item['imageUrl']);
+                    }
+                  },
+                  child: SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
+                        ? ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        item['imageUrl'],
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    )
+                        : const Icon(Icons.inventory, color: Colors.blueGrey, size: 40),
+                  ),
                 ),
                 title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text('${item['price']} đ', style: const TextStyle(color: Colors.red)),
