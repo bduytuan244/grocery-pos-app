@@ -71,6 +71,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // --- HÀM 2: LƯU SẢN PHẨM VÀO DATABASE SPRING BOOT ---
   Future<void> _submitProduct() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
