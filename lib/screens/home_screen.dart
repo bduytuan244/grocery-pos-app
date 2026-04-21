@@ -88,6 +88,49 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // === THÊM HÀM NÀY: HIỂN THỊ ẢNH PHÓNG TO (ZOOM) ===
+  void _showZoomedImageDialog(BuildContext context, String imageUrl) {
+    if (imageUrl.isEmpty) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Theme(
+        data: Theme.of(context).copyWith(dialogBackgroundColor: Colors.transparent),
+        child: Dialog(
+          backgroundColor: Colors.black54, // Nền tối để nổi bật ảnh
+          insetPadding: EdgeInsets.zero, // Tràn viền
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context), // Nhấn ra ngoài để đóng
+                child: Container(color: Colors.transparent),
+              ),
+              InteractiveViewer(
+                clipBehavior: Clip.none,
+                minScale: 0.5,
+                maxScale: 5.0, // Zoom x5
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.white, size: 100),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     int totalItems = cart.fold(0, (sum, item) => sum + (item['quantity'] as int));
@@ -101,7 +144,6 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.settings, size: 28),
             onPressed: () async {
-              // Mở màn hình kho, đợi khi nào tắt kho quay lại thì tải lại giao diện chính
               await Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen()));
               setState(() {
                 _productsFuture = fetchProducts();
@@ -117,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-          // 3. NÚT GIỎ HÀNG (Kèm cục báo số màu đỏ)
+          // 3. NÚT GIỎ HÀNG
           Stack(
             alignment: Alignment.center,
             children: [
@@ -273,20 +315,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Nếu có link ảnh và link không bị trống thì hiện ảnh. Nếu ảnh bị lỗi hoặc không có thì hiện cái Icon mặc định.
-                            (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
-                                ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                item['imageUrl'],
-                                height: 70,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                // Bắt lỗi nếu link ảnh bị chết thì tự hiện icon thay thế
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
-                              ),
-                            )
-                                : const Icon(Icons.inventory_2, size: 60, color: Colors.teal),
+                            // === THAY ĐỔI Ở ĐÂY: BỌC ẢNH VÀO GESTURE DETECTOR ĐỂ ZOOM ===
+                            GestureDetector(
+                              onTap: () {
+                                if (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty) {
+                                  _showZoomedImageDialog(context, item['imageUrl']);
+                                }
+                              },
+                              child: (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
+                                  ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  item['imageUrl'],
+                                  height: 70,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+                                ),
+                              )
+                                  : const Icon(Icons.inventory_2, size: 60, color: Colors.teal),
+                            ),
                             const SizedBox(height: 10),
                             Text(
                               item['name'] ?? 'Chưa có tên',
