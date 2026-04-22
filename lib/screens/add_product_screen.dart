@@ -18,9 +18,38 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _priceController = TextEditingController();
   final _unitController = TextEditingController();
 
+
   bool _isLoading = false;
   Uint8List? _selectedImageBytes; // <--- Đổi từ File sang Uint8List
   String _finalImageUrl = "";
+
+  List<String> _dynamicCategories = [];
+  String? _selectedCategory; // Dùng nullable để chờ data
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
+
+  // Hàm gọi API lấy danh mục
+  Future<void> _fetchCategories() async {
+    try {
+      final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/categories'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          // Lấy đúng danh sách tên đã được Backend sắp xếp sẵn
+          _dynamicCategories = data.map((c) => c['name'].toString()).toList();
+          if (_dynamicCategories.isNotEmpty) {
+            _selectedCategory = _dynamicCategories.first; // Mặc định chọn thằng số 1
+          }
+        });
+      }
+    } catch (e) {
+      print("Lỗi tải danh mục: $e");
+    }
+  }
 
   // --- HÀM 1: CHỌN ẢNH VÀ ĐẨY LÊN IMGBB ---
   Future<void> _pickAndUploadImage() async {

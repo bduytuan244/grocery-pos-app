@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:typed_data'; // <--- DÙNG THƯ VIỆN NÀY THAY CHO dart:io
+import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -14,10 +14,31 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   late Future<List<dynamic>> _productsFuture;
 
+  // === THÊM BIẾN LƯU DANH SÁCH DANH MỤC TỪ SERVER ===
+  List<String> _categories = [];
+
   @override
   void initState() {
     super.initState();
     _productsFuture = fetchProducts();
+    _fetchCategories(); // Gọi API tải danh mục khi mở Kho hàng
+  }
+
+  // === HÀM TẢI DANH MỤC ===
+  Future<void> _fetchCategories() async {
+    try {
+      final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/categories'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (mounted) {
+          setState(() {
+            _categories = data.map((c) => c['name'].toString()).toList();
+          });
+        }
+      }
+    } catch (e) {
+      print("Lỗi tải danh mục: $e");
+    }
   }
 
   Future<List<dynamic>> fetchProducts() async {
@@ -76,9 +97,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final nameController = TextEditingController(text: product['name']);
     final priceController = TextEditingController(text: product['price'].toString());
 
-    String finalImageUrl = product['imageUrl'] ?? '';
+    // === XỬ LÝ DANH MỤC HIỆN TẠI CỦA SẢN PHẨM ===
+    String currentCategory = product['category'] ?? 'Khác';
 
-    // === THAY ĐỔI LỚN Ở ĐÂY: DÙNG Uint8List THAY CHO File ===
+    // Nếu danh mục cũ không tồn tại trong danh sách mới tải về từ server,
+    // ta tạm thời thêm nó vào để Dropdown không bị lỗi crash đỏ màn hình.
+    if (_categories.isNotEmpty && !_categories.contains(currentCategory)) {
+      currentCategory = _categories.first; // Hoặc ép nó về danh mục đầu tiên
+    } else if (_categories.isEmpty) {
+      _categories = [currentCategory]; // Fallback an toàn nếu API chưa tải xong
+    }
+
+    String finalImageUrl = product['imageUrl'] ?? '';
     Uint8List? selectedImageBytes;
     bool isUploading = false;
 
@@ -93,7 +123,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
                 if (image != null) {
-                  // Đọc file thành cục dữ liệu Bytes (Chạy được trên Web)
                   final bytes = await image.readAsBytes();
 
                   setStateDialog(() {
@@ -105,7 +134,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     String apiKey = "4f4db14c9c558c9d21817076fd50cc78";
                     var request = http.MultipartRequest('POST', Uri.parse('https://api.imgbb.com/1/upload?key=$apiKey'));
 
-                    // Nén cục Bytes đó gửi lên mạng, bỏ qua đường dẫn ảo của Web
                     request.files.add(http.MultipartFile.fromBytes(
                         'image',
                         bytes,
@@ -151,7 +179,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           child: isUploading
                               ? const Center(child: CircularProgressIndicator(color: Colors.teal))
                               : selectedImageBytes != null
-                          // Thay Image.file bằng Image.memory
                               ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.memory(selectedImageBytes!, fit: BoxFit.cover))
                               : finalImageUrl.isNotEmpty
                               ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.network(finalImageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image_not_supported)))
@@ -171,6 +198,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         decoration: const InputDecoration(labelText: 'Tên mặt hàng', border: OutlineInputBorder()),
                       ),
                       const SizedBox(height: 10),
+
+                      // === DROPDOWN CHỌN DANH MỤC TRONG BẢNG SỬA ===
+                      DropdownButtonFormField<String>(
+                        value: currentCategory,
+                        decoration: const InputDecoration(labelText: 'Danh mục', border: OutlineInputBorder()),
+                        items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+                        onChanged: (val) {
+                          setStateDialog(() {
+                            currentCategory = val!;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
                       TextField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
@@ -189,6 +230,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         updatedProduct['name'] = nameController.text;
                         updatedProduct['price'] = double.parse(priceController.text);
                         updatedProduct['imageUrl'] = finalImageUrl;
+
+                        // === GẮN CATEGORY MỚI VÀO ĐỂ GỬI LÊN SERVER ===
+                        updatedProduct['category'] = currentCategory;
 
                         final response = await http.put(
                           Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products/${product['id']}'),
@@ -263,7 +307,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ),
                 title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${item['price']} đ', style: const TextStyle(color: Colors.red)),
+                subtitle: Text('${item['price']} đ\nDanh mục: ${item['category'] ?? "Khác"}', style: const TextStyle(color: Colors.red)), // Hiển thị thêm danh mục cho dễ nhìn
+                isThreeLine: true,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

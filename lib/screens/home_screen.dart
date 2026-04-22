@@ -21,7 +21,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Các biến tìm kiếm
   String _searchQuery = '';
+
+  // === BIẾN MỚI CHO DANH MỤC ===
   String _selectedCategory = 'Tất cả';
+  List<String> _dynamicCategories = ['Tất cả']; // Mặc định luôn có 'Tất cả'
+  bool _isLoadingCategories = true;
 
   // Danh sách lưu 5 đơn gần nhất
   List<Map<String, dynamic>> recentOrders = [];
@@ -30,6 +34,30 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _productsFuture = fetchProducts();
+    _fetchCategories(); // Gọi API lấy danh mục khi mới mở app
+  }
+
+  // === HÀM MỚI: LẤY DANH MỤC TỪ MONGODB VỀ ===
+  Future<void> _fetchCategories() async {
+    try {
+      final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/categories'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          _dynamicCategories = ['Tất cả']; // Reset lại danh sách, giữ chữ Tất cả ở đầu
+          _dynamicCategories.addAll(data.map((c) => c['name'].toString()));
+          _isLoadingCategories = false;
+
+          // Kiểm tra an toàn: Lỡ category hiện tại bị xóa thì reset về 'Tất cả'
+          if (!_dynamicCategories.contains(_selectedCategory)) {
+            _selectedCategory = 'Tất cả';
+          }
+        });
+      }
+    } catch (e) {
+      print("Lỗi tải danh mục: $e");
+      setState(() => _isLoadingCategories = false);
+    }
   }
 
   Future<List<dynamic>> fetchProducts() async {
@@ -88,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // === THÊM HÀM NÀY: HIỂN THỊ ẢNH PHÓNG TO (ZOOM) ===
+  // Hiển thị ảnh phóng to
   void _showZoomedImageDialog(BuildContext context, String imageUrl) {
     if (imageUrl.isEmpty) return;
     showDialog(
@@ -147,6 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
               await Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen()));
               setState(() {
                 _productsFuture = fetchProducts();
+                _fetchCategories(); // Cập nhật lại danh mục lỡ có thay đổi
               });
             },
           ),
@@ -217,8 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           final allProducts = snapshot.data!;
 
-          List<String> categories = ['Tất cả'];
-          categories.addAll(allProducts.map((p) => p['category'].toString()).toSet().toList());
+          // ĐÃ XÓA ĐOẠN CODE GOM NHÓM DANH MỤC CŨ Ở ĐÂY
 
           final filteredProducts = allProducts.where((product) {
             final matchesSearch = product['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
@@ -250,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
+              // 2. DROPDOWN LỌC DANH MỤC ĐÃ ĐƯỢC CẬP NHẬT
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                 child: Row(
@@ -265,12 +294,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: DropdownButtonHideUnderline(
+                        // Nếu đang tải thì hiện vòng tròn nhỏ, tải xong hiện Dropdown
+                        child: _isLoadingCategories
+                            ? const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                            : DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _selectedCategory,
                             isExpanded: true,
                             icon: const Icon(Icons.arrow_drop_down, color: Colors.teal),
-                            items: categories.map((String category) {
+                            items: _dynamicCategories.map((String category) {
                               return DropdownMenuItem<String>(
                                 value: category,
                                 child: Text(category, style: const TextStyle(fontSize: 16)),
@@ -290,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 10), // Khoảng cách với Lịch sử đơn hàng
+              const SizedBox(height: 10),
 
               RecentOrdersWidget(orders: recentOrders),
 
@@ -315,7 +350,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // === THAY ĐỔI Ở ĐÂY: BỌC ẢNH VÀO GESTURE DETECTOR ĐỂ ZOOM ===
                             GestureDetector(
                               onTap: () {
                                 if (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty) {
