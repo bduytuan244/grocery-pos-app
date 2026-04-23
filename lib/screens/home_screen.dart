@@ -21,11 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Các biến tìm kiếm
   String _searchQuery = '';
-
-  // === BIẾN MỚI CHO DANH MỤC ===
   String _selectedCategory = 'Tất cả';
-  List<String> _dynamicCategories = ['Tất cả']; // Mặc định luôn có 'Tất cả'
-  bool _isLoadingCategories = true;
 
   // Danh sách lưu 5 đơn gần nhất
   List<Map<String, dynamic>> recentOrders = [];
@@ -34,30 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _productsFuture = fetchProducts();
-    _fetchCategories(); // Gọi API lấy danh mục khi mới mở app
-  }
-
-  // === HÀM MỚI: LẤY DANH MỤC TỪ MONGODB VỀ ===
-  Future<void> _fetchCategories() async {
-    try {
-      final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/categories'));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() {
-          _dynamicCategories = ['Tất cả']; // Reset lại danh sách, giữ chữ Tất cả ở đầu
-          _dynamicCategories.addAll(data.map((c) => c['name'].toString()));
-          _isLoadingCategories = false;
-
-          // Kiểm tra an toàn: Lỡ category hiện tại bị xóa thì reset về 'Tất cả'
-          if (!_dynamicCategories.contains(_selectedCategory)) {
-            _selectedCategory = 'Tất cả';
-          }
-        });
-      }
-    } catch (e) {
-      print("Lỗi tải danh mục: $e");
-      setState(() => _isLoadingCategories = false);
-    }
   }
 
   Future<List<dynamic>> fetchProducts() async {
@@ -175,7 +147,6 @@ class _HomeScreenState extends State<HomeScreen> {
               await Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen()));
               setState(() {
                 _productsFuture = fetchProducts();
-                _fetchCategories(); // Cập nhật lại danh mục lỡ có thay đổi
               });
             },
           ),
@@ -246,13 +217,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
           final allProducts = snapshot.data!;
 
-          // ĐÃ XÓA ĐOẠN CODE GOM NHÓM DANH MỤC CŨ Ở ĐÂY
+          // === CHIẾN THUẬT LAI: ƯU TIÊN CỐ ĐỊNH + QUÉT TỰ ĐỘNG KHO ===
+          // 1. Danh sách cứng theo thứ tự ưu tiên
+          final List<String> priorityCategories = ['Tất cả', 'Sắt thép', 'Ống nước', 'Đồ điện', 'Đinh - Vít', 'Dụng cụ cầm tay', 'Sơn - Keo', 'Khác'];
 
-          final filteredProducts = allProducts.where((product) {
+          // 2. Quét kho xem có danh mục nào "Lạ" không (VD: sắt hộp)
+          Set<String> existingCategories = {};
+          for (var p in allProducts) {
+            if (p['category'] != null && p['category'].toString().isNotEmpty) {
+              existingCategories.add(p['category'].toString());
+            }
+          }
+
+          // 3. Ghép nối: Lấy danh sách ưu tiên làm gốc, nếu gặp từ lạ thì nhét xuống cuối.
+          List<String> finalCategories = List.from(priorityCategories);
+          for (String cat in existingCategories) {
+            if (!finalCategories.contains(cat)) {
+              finalCategories.add(cat);
+            }
+          }
+
+          // 4. Reset an toàn: Nếu danh mục đang chọn bị xóa sạch khỏi kho thì tự về 'Tất cả'
+          if (!finalCategories.contains(_selectedCategory)) {
+            _selectedCategory = 'Tất cả';
+          }
+
+          // === LỌC VÀ SẮP XẾP SẢN PHẨM ===
+          var filteredProducts = allProducts.where((product) {
             final matchesSearch = product['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
             final matchesCategory = _selectedCategory == 'Tất cả' || product['category'] == _selectedCategory;
             return matchesSearch && matchesCategory;
           }).toList();
+
+          // Sắp xếp MỚI NHẤT lên đầu (dựa vào ID của MongoDB)
+          filteredProducts.sort((a, b) => b['id'].toString().compareTo(a['id'].toString()));
 
           return Column(
             children: [
@@ -278,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // 2. DROPDOWN LỌC DANH MỤC ĐÃ ĐƯỢC CẬP NHẬT
+              // 2. DROPDOWN LỌC DANH MỤC
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                 child: Row(
@@ -294,18 +292,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        // Nếu đang tải thì hiện vòng tròn nhỏ, tải xong hiện Dropdown
-                        child: _isLoadingCategories
-                            ? const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                        )
-                            : DropdownButtonHideUnderline(
+                        child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _selectedCategory,
                             isExpanded: true,
                             icon: const Icon(Icons.arrow_drop_down, color: Colors.teal),
-                            items: _dynamicCategories.map((String category) {
+                            items: finalCategories.map((String category) {
                               return DropdownMenuItem<String>(
                                 value: category,
                                 child: Text(category, style: const TextStyle(fontSize: 16)),

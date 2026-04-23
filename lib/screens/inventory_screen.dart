@@ -14,31 +14,13 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   late Future<List<dynamic>> _productsFuture;
 
-  // === THÊM BIẾN LƯU DANH SÁCH DANH MỤC TỪ SERVER ===
-  List<String> _categories = [];
+  // Biến tìm kiếm
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _productsFuture = fetchProducts();
-    _fetchCategories(); // Gọi API tải danh mục khi mở Kho hàng
-  }
-
-  // === HÀM TẢI DANH MỤC ===
-  Future<void> _fetchCategories() async {
-    try {
-      final response = await http.get(Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/categories'));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
-        if (mounted) {
-          setState(() {
-            _categories = data.map((c) => c['name'].toString()).toList();
-          });
-        }
-      }
-    } catch (e) {
-      print("Lỗi tải danh mục: $e");
-    }
   }
 
   Future<List<dynamic>> fetchProducts() async {
@@ -74,13 +56,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         child: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: InteractiveViewer(
-            panEnabled: true,
-            boundaryMargin: const EdgeInsets.all(20),
-            minScale: 0.5,
-            maxScale: 4,
+            panEnabled: true, boundaryMargin: const EdgeInsets.all(20), minScale: 0.5, maxScale: 4,
             child: Image.network(
-              imageUrl,
-              fit: BoxFit.contain,
+              imageUrl, fit: BoxFit.contain,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -93,20 +71,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  void _showEditDialog(Map<String, dynamic> product) {
+  // === CẬP NHẬT TRUYỀN DANH SÁCH DANH MỤC VÀO BẢNG SỬA ===
+  void _showEditDialog(Map<String, dynamic> product, List<String> allExistingCategories) {
     final nameController = TextEditingController(text: product['name']);
     final priceController = TextEditingController(text: product['price'].toString());
+    final newCategoryController = TextEditingController();
 
-    // === XỬ LÝ DANH MỤC HIỆN TẠI CỦA SẢN PHẨM ===
     String currentCategory = product['category'] ?? 'Khác';
+    bool isAddingNewCategory = false;
 
-    // Nếu danh mục cũ không tồn tại trong danh sách mới tải về từ server,
-    // ta tạm thời thêm nó vào để Dropdown không bị lỗi crash đỏ màn hình.
-    if (_categories.isNotEmpty && !_categories.contains(currentCategory)) {
-      currentCategory = _categories.first; // Hoặc ép nó về danh mục đầu tiên
-    } else if (_categories.isEmpty) {
-      _categories = [currentCategory]; // Fallback an toàn nếu API chưa tải xong
-    }
+    // Chuẩn bị Dropdown List
+    List<String> dropdownItems = List.from(allExistingCategories);
+    if (!dropdownItems.contains(currentCategory)) dropdownItems.insert(0, currentCategory);
+    dropdownItems.add('➕ Đổi tên danh mục khác...');
 
     String finalImageUrl = product['imageUrl'] ?? '';
     Uint8List? selectedImageBytes;
@@ -124,33 +101,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                 if (image != null) {
                   final bytes = await image.readAsBytes();
-
-                  setStateDialog(() {
-                    selectedImageBytes = bytes;
-                    isUploading = true;
-                  });
+                  setStateDialog(() { selectedImageBytes = bytes; isUploading = true; });
 
                   try {
                     String apiKey = "4f4db14c9c558c9d21817076fd50cc78";
                     var request = http.MultipartRequest('POST', Uri.parse('https://api.imgbb.com/1/upload?key=$apiKey'));
-
-                    request.files.add(http.MultipartFile.fromBytes(
-                        'image',
-                        bytes,
-                        filename: image.name
-                    ));
+                    request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: image.name));
 
                     var response = await request.send();
                     var responseData = await response.stream.bytesToString();
                     var result = jsonDecode(responseData);
 
                     if (result['success'] == true) {
-                      setStateDialog(() {
-                        finalImageUrl = result['data']['url'];
-                      });
+                      setStateDialog(() { finalImageUrl = result['data']['url']; });
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đổi ảnh thành công!'), backgroundColor: Colors.green));
-                    } else {
-                      throw Exception("Lỗi từ ImgBB");
                     }
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi tải ảnh: $e'), backgroundColor: Colors.red));
@@ -165,58 +129,54 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       GestureDetector(
                         onTap: pickAndUploadImage,
                         child: Container(
-                          height: 120,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.teal, width: 1),
-                          ),
+                          height: 120, width: double.infinity,
+                          decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.teal, width: 1)),
                           child: isUploading
                               ? const Center(child: CircularProgressIndicator(color: Colors.teal))
                               : selectedImageBytes != null
                               ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.memory(selectedImageBytes!, fit: BoxFit.cover))
                               : finalImageUrl.isNotEmpty
                               ? ClipRRect(borderRadius: BorderRadius.circular(9), child: Image.network(finalImageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image_not_supported)))
-                              : const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate, size: 40, color: Colors.teal),
-                              Text('Bấm để đổi ảnh', style: TextStyle(color: Colors.teal)),
-                            ],
-                          ),
+                              : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_photo_alternate, size: 40, color: Colors.teal), Text('Bấm để đổi ảnh', style: TextStyle(color: Colors.teal))]),
                         ),
                       ),
                       const SizedBox(height: 15),
 
-                      TextField(
-                        controller: nameController,
-                        decoration: const InputDecoration(labelText: 'Tên mặt hàng', border: OutlineInputBorder()),
-                      ),
+                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Tên mặt hàng', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Giá bán (VNĐ)', border: OutlineInputBorder())),
                       const SizedBox(height: 10),
 
-                      // === DROPDOWN CHỌN DANH MỤC TRONG BẢNG SỬA ===
-                      DropdownButtonFormField<String>(
-                        value: currentCategory,
-                        decoration: const InputDecoration(labelText: 'Danh mục', border: OutlineInputBorder()),
-                        items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
-                        onChanged: (val) {
-                          setStateDialog(() {
-                            currentCategory = val!;
-                          });
-                        },
+                      // === DROPDOWN SỬA DANH MỤC THÔNG MINH ===
+                      const Text('Danh mục', style: TextStyle(fontSize: 12, color: Colors.teal)),
+                      Container(
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: isAddingNewCategory ? '➕ Đổi tên danh mục khác...' : currentCategory,
+                            isExpanded: true,
+                            items: dropdownItems.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+                            onChanged: (val) {
+                              setStateDialog(() {
+                                if (val == '➕ Đổi tên danh mục khác...') {
+                                  isAddingNewCategory = true;
+                                } else {
+                                  isAddingNewCategory = false;
+                                  currentCategory = val!;
+                                }
+                              });
+                            },
+                          ),
+                        ),
                       ),
-
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: priceController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Giá bán (VNĐ)', border: OutlineInputBorder()),
-                      ),
+                      if (isAddingNewCategory)
+                        Padding(padding: const EdgeInsets.only(top: 10), child: TextField(controller: newCategoryController, decoration: const InputDecoration(hintText: 'Nhập tên danh mục mới...', border: OutlineInputBorder()))),
                     ],
                   ),
                 ),
@@ -226,13 +186,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                     onPressed: isUploading ? null : () async {
                       try {
+                        String finalCat = isAddingNewCategory ? newCategoryController.text.trim() : currentCategory;
+                        if (finalCat.isEmpty) finalCat = "Khác";
+
                         Map<String, dynamic> updatedProduct = Map<String, dynamic>.from(product);
                         updatedProduct['name'] = nameController.text;
                         updatedProduct['price'] = double.parse(priceController.text);
                         updatedProduct['imageUrl'] = finalImageUrl;
-
-                        // === GẮN CATEGORY MỚI VÀO ĐỂ GỬI LÊN SERVER ===
-                        updatedProduct['category'] = currentCategory;
+                        updatedProduct['category'] = finalCat;
 
                         final response = await http.put(
                           Uri.parse('https://grocery-pos-backend-uoyv.onrender.com/api/products/${product['id']}'),
@@ -277,71 +238,109 @@ class _InventoryScreenState extends State<InventoryScreen> {
           if (snapshot.hasError) return Center(child: Text('Lỗi: ${snapshot.error}'));
           if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('Kho trống!'));
 
-          final products = snapshot.data!;
-          return ListView.separated(
-            padding: const EdgeInsets.all(10),
-            itemCount: products.length,
-            separatorBuilder: (context, index) => const Divider(),
-            itemBuilder: (context, index) {
-              final item = products[index];
-              return ListTile(
-                leading: GestureDetector(
-                  onTap: () {
-                    if (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty) {
-                      _showZoomedImageDialog(context, item['imageUrl']);
-                    }
-                  },
-                  child: SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
-                        ? ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        item['imageUrl'],
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, color: Colors.grey),
-                      ),
-                    )
-                        : const Icon(Icons.inventory, color: Colors.blueGrey, size: 40),
+          List<dynamic> allProducts = snapshot.data!;
+
+          // === TẠO DANH SÁCH DANH MỤC CHO DROPDOWN ===
+          final List<String> priorityCategories = ['Sắt thép', 'Ống nước', 'Đồ điện', 'Đinh - Vít', 'Dụng cụ cầm tay', 'Sơn - Keo', 'Khác'];
+          Set<String> catSet = {};
+          for (var p in allProducts) {
+            if (p['category'] != null && p['category'].toString().isNotEmpty) catSet.add(p['category'].toString());
+          }
+
+          List<String> finalCategories = List.from(priorityCategories);
+          for (String cat in catSet) {
+            if (!finalCategories.contains(cat)) finalCategories.add(cat);
+          }
+
+          // === TÌM KIẾM VÀ SẮP XẾP MỚI NHẤT LÊN ĐẦU ===
+          List<dynamic> filteredProducts = allProducts.where((p) => p['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+          filteredProducts.sort((a, b) => b['id'].toString().compareTo(a['id'].toString()));
+
+          return Column(
+            children: [
+              // --- THANH TÌM KIẾM TRONG KHO ---
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: TextField(
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm kiếm hàng trong kho...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true, fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
-                title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${item['price']} đ\nDanh mục: ${item['category'] ?? "Khác"}', style: const TextStyle(color: Colors.red)), // Hiển thị thêm danh mục cho dễ nhìn
-                isThreeLine: true,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () => _showEditDialog(item),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Xóa sản phẩm?'),
-                              content: Text('Bạn có chắc muốn xóa "${item['name']}" không?'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    _deleteProduct(item['id'].toString(), item['name']);
-                                  },
-                                  child: const Text('Xóa', style: TextStyle(color: Colors.red)),
-                                )
-                              ],
-                            )
-                        );
-                      },
-                    ),
-                  ],
+              ),
+              Expanded(
+                child: filteredProducts.isEmpty
+                    ? const Center(child: Text('Không tìm thấy sản phẩm.'))
+                    : ListView.separated(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: filteredProducts.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final item = filteredProducts[index];
+                    return ListTile(
+                      leading: GestureDetector(
+                        onTap: () {
+                          if (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty) {
+                            _showZoomedImageDialog(context, item['imageUrl']);
+                          }
+                        },
+                        child: SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: (item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty)
+                              ? ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              item['imageUrl'],
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, color: Colors.grey),
+                            ),
+                          )
+                              : const Icon(Icons.inventory, color: Colors.blueGrey, size: 40),
+                        ),
+                      ),
+                      title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('${item['price']} đ\nDanh mục: ${item['category'] ?? "Khác"}', style: const TextStyle(color: Colors.red)),
+                      isThreeLine: true,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditDialog(item, finalCategories), // Truyền list danh mục vào đây
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Xóa sản phẩm?'),
+                                    content: Text('Bạn có chắc muốn xóa "${item['name']}" không?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          _deleteProduct(item['id'].toString(), item['name']);
+                                        },
+                                        child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+                                      )
+                                    ],
+                                  )
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           );
         },
       ),
